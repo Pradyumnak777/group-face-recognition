@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Image</title>
+</head>
+<body>
+    <h1>Upload Image</h1>
+    <form action="/process-image" method="post" enctype="multipart/form-data">
+        <input type="file" name="image_file" accept="image/*">
+        <button type="submit">Upload</button>
+    </form>
+    {% if image_urls %}
+        <h2>Processed Images:</h2>
+        {% for url in image_urls %}
+            <img src="{{ url }}" alt="Processed Image">
+        {% endfor %}
+    {% endif %}
+</body>
+</html>
