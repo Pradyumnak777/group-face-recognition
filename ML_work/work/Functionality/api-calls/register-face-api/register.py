@@ -1,7 +1,7 @@
-import sys
-sys.path.insert(1, 'ML_work/our_method/Functionality/api-calls/detection-segmentation-api')
-for id,name in enumerate(sys.path):
-    print(f"index:{id}, name:{name}")
+# import sys
+# sys.path.insert(1, 'ML_work/our_method/Functionality/api-calls/register-face-api')
+# for id,name in enumerate(sys.path):
+#     print(f"index:{id}, name:{name}")
     
 from g2f import group2head
 import os
@@ -24,14 +24,16 @@ async def upload_imgs(files: List[UploadFile] = File(...),
                       student_name: str = Form(...),
                       group_name: str = Form(...)):
     #now, save this group as a dataset directory(like LFW) after head_segmentation
-    os.mkdir(f'ML_work/Datasets/demo/{group_name}/{student_name}')
-    cur_dir = f'ML_work/Datasets/demo/{group_name}/{student_name}'
+    os.makedirs(f'demo/{group_name}/{student_name}', exist_ok = True)
+    cur_dir = f'demo/{group_name}/{student_name}'
     for num,file in enumerate(files):
         contents = await file.read()
         #now- perform - face detection(1) and head segmentation(2)
         output_data = group2head(contents)
         for i, img in enumerate(output_data):
             img.save(f"{cur_dir}/{student_name}_{num}.jpg")
+    
+    return {"message": "Student registered"} 
             
 
 if __name__ == "__main__":
