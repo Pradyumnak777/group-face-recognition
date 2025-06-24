@@ -204,7 +204,6 @@ async def upload_imgs(files: List[UploadFile] = File(...),
                     s3_bucket, 
                     f"registration/{student_name}/{student_name}_model/{student_name}.pth"
                 )
-                count+=1
                 ###
                 
             #alright, now we have a model ready for a single person (when its NOT the first registration)
