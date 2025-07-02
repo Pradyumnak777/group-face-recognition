@@ -1,5 +1,13 @@
-from g2f import group2head
+from dotenv import load_dotenv
+from pathlib import Path
 import os
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[1].parent / '.env')
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / '.env')
+# print("Access Key:", os.getenv('AWS_ACCESS_KEY_ID'))
+# print("Secret Key:", os.getenv('AWS_SECRET_ACCESS_KEY'))
+# print("bucket name:", os.getenv('S3_BUCKET_NAME'))
+
+from api_calls_and_functions.shared_material.util_functions import group2head_reg
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from typing import List
 from PIL import Image
@@ -10,7 +18,7 @@ import boto3
 import tempfile
 import numpy as np
 import io
-from api_calls_and_functions.model_training import (
+from api_calls_and_functions.shared_material.util_functions.models_n_training import (
     augment_positive_set,
     get_single_image_embeddings,
     get_embeddings_from_image_list,
@@ -40,21 +48,28 @@ async def upload_imgs(files: List[UploadFile] = File(...),
 
         for num, file in enumerate(files):
             contents = await file.read()
-            output_data = group2head(contents)
+            output_data = group2head_reg(contents)
             for _, img in enumerate(output_data):
-                s3_client.upload_file(img, s3_bucket, f"registration/{student_name}/{student_name}_inital.jpg")
+                img_byte_arr = io.BytesIO()
+                img.save(img_byte_arr, format='JPEG')
+                img_byte_arr.seek(0)
+
+                # Now upload to S3 using fileobj
+                s3_client.upload_fileobj(img_byte_arr, s3_bucket, f"registration/{student_name}/{student_name}_initial.jpg")
 
         #now, perform 'registering'
 
-        response = s3_client.list_objects_v2(Bucket=s3_bucket, Prefix='registration/')
         img_embedding = get_single_image_embeddings(img)
+        print("Device of img_embedding:", img_embedding.device)
+
         with io.BytesIO() as f:
             np.save(f, img_embedding)
             f.seek(0)
             s3_client.upload_fileobj(f, s3_bucket, f"registration/{student_name}/{student_name}_embedding/{student_name}.npy")
         #embedding has been uploaded
+        response = s3_client.list_objects_v2(Bucket=s3_bucket, Prefix='registration/')
         
-        if 'Contents' not in response or len(response.get('Contents', [])) == 0:
+        if len(response.get('Contents', [])) == 2:
             #this is the first registration, model wont be trained now. Only embeddings from facenet will be extracted
             #create an empty student_embeddings_dict and save locally in api_calls_and_functions/model_training/required
             student_embeddings_dict = {}
@@ -68,7 +83,7 @@ async def upload_imgs(files: List[UploadFile] = File(...),
         else:
             #this is not the first registration
             #therefore, append embedding of this image to existing student_embedding dict
-            if 'Contents' in response and len(response.get('Contents', [])) > 0:
+            if 'Contents' in response and len(response.get('Contents', [])) > 2:
                 buffer = io.BytesIO()
                 s3_client.download_fileobj(Bucket=s3_bucket, Key='embedding_dictionary/student_embeddings_dict.npz', Fileobj=buffer)
                 buffer.seek(0)
@@ -86,13 +101,15 @@ async def upload_imgs(files: List[UploadFile] = File(...),
             augmented_pos_set = augment_positive_set(img) #will not be used if there's only 1 registered face. this i primarily for hard negative mining.
             #'augment_pos_set' is now an array of tranformed PIL images
             pos_embeddings = get_embeddings_from_image_list(augmented_pos_set)
-            neg_embeddings = np.load('api_calls_and_functions/model_training/required/world_neg_array.npy')
+            pos_embeddings = [tensor.cpu().numpy() for tensor in pos_embeddings]
+            pos_embeddings = np.stack(pos_embeddings) #now, it matches the dimensions of neg_embeddings
+            neg_embeddings = np.load('api_calls_and_functions/shared_material/packages/world_neg_array.npy')
             
             #perform initial training before boosting-
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             model2 = bin_classifier().to(device)
             optimizer = torch.optim.Adam(model2.parameters(), lr=0.0001)
-            model2 = train_classifier(pos_embeddings,neg_embeddings,student_name,model2,optimizer)
+            model2 = train_classifier(pos_embeddings,neg_embeddings,model2,optimizer)
             
             #now, create a dataloader/dataset from the dictionary in s3 (to perform bootstrapping/boosting)
             with tempfile.NamedTemporaryFile() as tmp:
@@ -107,7 +124,7 @@ async def upload_imgs(files: List[UploadFile] = File(...),
                 threshold = 0.95
                 ###
                 metric = 0
-                while metric < threshold :
+                while metric < threshold:
                     model2.to(device)
                     model2.eval()
                     fp = [] #false positives
@@ -181,15 +198,15 @@ async def upload_imgs(files: List[UploadFile] = File(...),
                         if len(fp)!= 0:
                             fp_arr = np.array([tensor.cpu().numpy() for tensor in fp], dtype=float)
                             print("in loop training")
-                            world_neg_person = np.concatenate((world_neg_person,fp_arr))    #add fp to world_neg_person
+                            neg_embeddings = np.concatenate((neg_embeddings,fp_arr))    #add fp to world_neg_person
                             
                         if len(fn) != 0:
                             fn_arr = np.array([tensor.cpu().numpy() for tensor in fn], dtype=float)
                             print("in loop training")
-                            embeddings_positive = np.concatenate((embeddings_positive,fn_arr))   #add fn to embeddings_positive
+                            embeddings_positive = np.concatenate((pos_embeddings,fn_arr))   #add fn to embeddings_positive
                         
                         
-                        model2 = train_classifier(embeddings_positive,world_neg_person,model2,optimizer)
+                        model2 = train_classifier(embeddings_positive,neg_embeddings,model2,optimizer)
 
 
                 # os.makedirs(f'/face_attendance/benchmarking/people/{person_name}/{person_name}_world_neg', exist_ok=True)

@@ -1,0 +1,38 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Register API",
+      "type": "python",
+      "request": "launch",
+      "module": "api_calls_and_functions.register_face_api.register",
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Detect API",
+      "type": "python",
+      "request": "launch",
+      "module": "api_calls_and_functions.mark_person_api.test",
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "rtraining API",
+      "type": "python",
+      "request": "launch",
+      "module": "api_calls_and_functions.retraining_api.retraining",
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    }
+  ]
+}

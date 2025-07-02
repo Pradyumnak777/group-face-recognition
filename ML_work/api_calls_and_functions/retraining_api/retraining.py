@@ -1,3 +1,7 @@
+from dotenv import load_dotenv
+from pathlib import Path
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[2] / '.env')
+
 from fastapi import FastAPI, HTTPException, File, Form
 import traceback
 import boto3
@@ -8,9 +12,8 @@ import numpy as np
 from torch.utils.data import DataLoader
 import torch
 import tempfile
-from api_calls_and_functions.model_training import (
+from api_calls_and_functions.shared_material.util_functions.models_n_training import (
     augment_positive_set,
-    get_single_image_embeddings,
     get_embeddings_from_image_list,
     BoostingDataset,
     bin_classifier,
@@ -48,7 +51,7 @@ async def retrain_model(student_name: str = Form(...)):
         augmented_pos_set = augment_positive_set(img) #will not be used if there's only 1 registered face. this i primarily for hard negative mining.
         #'augment_pos_set' is now an array of tranformed PIL images
         pos_embeddings = get_embeddings_from_image_list(augmented_pos_set)
-        neg_embeddings = np.load('api_calls_and_functions/model_training/required/world_neg_array.npy')
+        neg_embeddings = np.load('api_calls_and_functions/shared_material/packages/world_neg_array.npy')
     
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model2 = bin_classifier().to(device)
