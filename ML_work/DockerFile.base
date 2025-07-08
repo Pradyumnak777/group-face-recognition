@@ -1,0 +1,24 @@
+FROM pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    git ffmpeg libsm6 libxext6 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY req.txt .
+RUN pip install --no-cache-dir -r req.txt
+
+COPY api_calls_and_functions/shared_material ./api_calls_and_functions/shared_material
+COPY api_calls_and_functions/register_face_api/register.py ./api_calls_and_functions/register_face_api/register.py
+COPY api_calls_and_functions/mark_person_api/test.py ./api_calls_and_functions/mark_person_api/test.py
+COPY unified_app.py .
+
+# copy the pre-trained on vggface into the container
+COPY 20180402-114759-vggface2.pt /root/.cache/torch/checkpoints/
+CMD ["uvicorn", "unified_app:app", "--host", "0.0.0.0", "--port", "8000"]
+

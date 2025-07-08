@@ -1,0 +1,12 @@
+torch
+torchvision
+boto3
+numpy
+python-dotenv
+fastapi
+ultralytics
+uvicorn
+opencv-python-headless
+Pillow
+python-multipart
+git+https://github.com/wiktorlazarski/head-segmentation.git

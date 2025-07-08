@@ -3,15 +3,11 @@ from pathlib import Path
 import os
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1].parent / '.env')
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / '.env')
-# print("Access Key:", os.getenv('AWS_ACCESS_KEY_ID'))
-# print("Secret Key:", os.getenv('AWS_SECRET_ACCESS_KEY'))
-# print("bucket name:", os.getenv('S3_BUCKET_NAME'))
+
 
 from api_calls_and_functions.shared_material.util_functions import group2head_reg
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from typing import List
-from PIL import Image
-from torch.utils.data import DataLoader
 import torch
 import traceback
 import boto3

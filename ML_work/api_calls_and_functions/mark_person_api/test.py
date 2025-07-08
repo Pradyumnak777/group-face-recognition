@@ -3,7 +3,7 @@ from pathlib import Path
 import os
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1].parent / '.env')
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / '.env')
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
 import cv2
 import numpy as np
