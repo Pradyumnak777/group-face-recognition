@@ -113,29 +113,72 @@ class custom_head(nn.Module):
         return torch.mean(F.relu(d_pos - d_neg + margin))
 
 
+# class TripletDataset(Dataset):
+#     def __init__(self, pos_embeds, neg_embeds):
+#         self.pos_embeds = pos_embeds
+#         self.neg_embeds = neg_embeds
+#     def __len__(self):
+#         return len(self.pos_embeds) * 20 
+#     def __getitem__(self, idx):
+#         pos_indices = random.sample(range(len(self.pos_embeds)), 2) #so, anchor != pos
+#         anchor = self.pos_embeds[pos_indices[0]]
+#         positive = self.pos_embeds[pos_indices[1]]
+#         neg_idx = random.randint(0,len(self.neg_embeds) - 1)
+#         negative = self.neg_embeds[neg_idx]
+#         return (
+#             torch.tensor(anchor, dtype=torch.float32),
+#             torch.tensor(positive, dtype=torch.float32),
+#             torch.tensor(negative, dtype=torch.float32),
+#         )
+
 class TripletDataset(Dataset):
-    def __init__(self, pos_embeds, neg_embeds):
-        self.pos_embeds = pos_embeds
-        self.neg_embeds = neg_embeds
+    def __init__(self, student_dict):
+        self.data = [] #embed data
+        self.labels = [] # name data
+        for stud,embeds in student_dict.items(): #{student: [emb1 (512d), emb2 (512d), ...]}
+            for emb in embeds:
+                self.data.append(emb) 
+                self.labels.append(stud)
+
+        self.data = np.array(self.data)
+        self.labels = np.array(self.labels)
+        self.student_dict = student_dict
+    
     def __len__(self):
-        return len(self.pos_embeds) * 20 
-    def __getitem__(self, idx):
-        pos_indices = random.sample(range(len(self.pos_embeds)), 2) #so, anchor != pos
-        anchor = self.pos_embeds[pos_indices[0]]
-        positive = self.pos_embeds[pos_indices[1]]
-        neg_idx = random.randint(0,len(self.neg_embeds) - 1)
-        negative = self.neg_embeds[neg_idx]
+        return len(self.data) * 5
+    
+    def __getitem__(self, index):
+        #select an anchor at random
+        anchor_idx = random.randint(0, len(self.data) - 1)
+        anchor_label = self.labels[anchor_idx]
+        anchor = self.data[anchor_idx]
+        
+        #chose another random one frmo the same student
+        pos_embed_list = self.student_dict[anchor_label] 
+        while True:
+            pos_idx = random.randint(0, len(pos_embed_list) - 1)
+            positive = pos_embed_list[pos_idx]
+            if not np.array_equal(anchor, positive):
+                break
+        
+        #now chose negative
+        
+        neg_label_options = [i for i in self.student_dict if i != anchor_label]
+        neg_label = random.choice(neg_label_options)
+        neg = random.choice(self.student_dict[neg_label])
+
         return (
             torch.tensor(anchor, dtype=torch.float32),
             torch.tensor(positive, dtype=torch.float32),
-            torch.tensor(negative, dtype=torch.float32),
+            torch.tensor(neg, dtype=torch.float32)
         )
+        
 
-def train_head(pos_set, neg_set, model2, optimizer):
+def train_head(student_embeddings_dict, model2, optimizer):
     device = next(model2.parameters()).device
-    triplet_dataset = TripletDataset(pos_set, neg_set)     
+    triplet_dataset = TripletDataset(student_embeddings_dict)     
     triplet_loader = DataLoader(triplet_dataset, batch_size=32, shuffle=True)
-    num_epochs = 40
+    num_epochs = 20
     model2.train()
     for epoch in range(num_epochs):
         total_loss = 0.0

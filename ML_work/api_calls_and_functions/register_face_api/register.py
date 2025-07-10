@@ -89,7 +89,17 @@ async def upload_imgs(files: List[UploadFile] = File(...),
             pos_embeddings = get_embeddings_from_image_list(augmented_pos_set)
             pos_embeddings = [tensor.cpu().numpy() for tensor in pos_embeddings]
             pos_embeddings = np.stack(pos_embeddings) 
-            student_embeddings_dict[student_name] = pos_embeddings 
+            # student_embeddings_dict[student_name] = pos_embeddings
+            if student_name in student_embeddings_dict:
+                print("already registered")
+                student_embeddings_dict[student_name] = np.vstack((student_embeddings_dict[student_name], pos_embeddings))
+            else:
+                student_embeddings_dict[student_name] = pos_embeddings
+            
+            print("shape: ",student_embeddings_dict[student_name].shape)    
+            if student_embeddings_dict[student_name].shape[0] > 32:
+                student_embeddings_dict[student_name] = student_embeddings_dict[student_name][-32:]
+                print("new shape: ",student_embeddings_dict[student_name].shape)   
             new_buffer = io.BytesIO()
             np.savez(new_buffer, **student_embeddings_dict)
             new_buffer.seek(0)
@@ -97,10 +107,10 @@ async def upload_imgs(files: List[UploadFile] = File(...),
             #the above code section performs updation of the embedding dict on amazon s3
             
             #to get the negative embeddings, take embeddings from all OTHER students and concatenate
-            neg_embeddings = np.empty((0,512), dtype=np.float32)
-            for k,v in student_embeddings_dict.items():
-                if k != student_name:
-                    neg_embeddings = np.vstack((neg_embeddings, v))
+            # neg_embeddings = np.empty((0,512), dtype=np.float32)
+            # for k,v in student_embeddings_dict.items():
+            #     if k != student_name:
+            #         neg_embeddings = np.vstack((neg_embeddings, v))
             
             #now train
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -125,7 +135,7 @@ async def upload_imgs(files: List[UploadFile] = File(...),
                 print("Loaded existing model state from S3.")
                         
             optimizer = torch.optim.Adam(model2.parameters(), lr=0.001)
-            model2 = train_head(pos_embeddings,neg_embeddings,model2,optimizer)
+            model2 = train_head(student_embeddings_dict,model2,optimizer)
             
             #this model will now be used(and updated, upon new registrations) globally
             model_buffer = io.BytesIO()

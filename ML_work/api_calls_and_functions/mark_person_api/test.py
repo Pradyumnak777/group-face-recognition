@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 from pathlib import Path
 import os
+import base64
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1].parent / '.env')
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / '.env')
 from fastapi import FastAPI, HTTPException, UploadFile, File
@@ -47,6 +48,11 @@ async def detect(file: UploadFile = File(...)):
                 if obj['Key'] == 'model/model.pth':
                     model_exists = True
                     break
+        
+        #preparing world_neg_array-
+        # world_neg_array = np.load('api_calls_and_functions/shared_material/packages/world_neg_array.npy')
+        # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # world_neg_tensor = torch.tensor(world_neg_array, dtype=torch.float32).to(device)
 
         if model_exists == False: #we CANNOT use that model for prediction, use cosine similarity from inception model
             
@@ -62,9 +68,19 @@ async def detect(file: UploadFile = File(...)):
 
                 # Now emb.shape and registered_emb.shape are both [1, 512]
                 # Compare along the 512-dim vector axis (dim=1)
+                detected_people = []
                 sim = F.cosine_similarity(emb, registered_emb, dim=1).item()
-                if sim > 0.66:
+                # neg_sims = F.cosine_similarity(emb, world_neg_tensor, dim=1)
+                # avg_world_sim = torch.mean(neg_sims).item()
+                # best_world_sim = torch.max(neg_sims).item()
+
+                # print(f'sim: {sim:.2f}, avg_neg_sim: {avg_world_sim:.2f}, highest neg_sim: {best_world_sim:.2f}')
+                print(f'sim: {sim:.2f}')
+
+                # if sim > 0.65 and sim > best_world_sim and sim > avg_world_sim + 0.2:
+                if sim > 0.65:
                     student_name = embedding_key.split('/')[1]
+                    detected_people.append(student_name)
                     print(f"Detected {student_name} with similarity {sim:.2f}")
                     #add to future frame the current detected bounding box
                     x1, y1, x2, y2 = map(int, boxes[idx])
@@ -82,42 +98,91 @@ async def detect(file: UploadFile = File(...)):
 
             model_state_dict = torch.load(tmp_file_path, map_location=device)    
             os.remove(tmp_file_path)
-        
+            
+            # #now parse world_neg thru this head
+            # with torch.no_grad():
+            #     world_neg_proj = get_head_embs(world_neg_tensor, model_state_dict)
+                
             img_np = cv2.cvtColor(np.array(Image.open(io.BytesIO(contents))), cv2.COLOR_RGB2BGR)
             #get all student embeddings-
             embeddings = get_all_student_embeddings(s3_client, s3_bucket)
+            detected_people = []
+            raw_threshold = 0.5 #our 512d emb
+            head_threshold = 0.65 # 64d extension
             for idx, person in enumerate(segmented_heads):  # PIL images
                 emb = get_single_image_embeddings(person)  # shape: [1, 512]
                 #now pass this through the extended head
+                #!!!
+                #now, we first need to eliminate 'unregistered' faces. facenet is best at doing this
+                scores_raw = {}
+                best_raw_sim, best_raw_name = -1, None
+                for e,name in embeddings:
+                    sim = F.cosine_similarity(emb, e, dim=1).item() #both are 512-d embs , for now
+                    scores_raw[name] = sim
+                    if sim > best_raw_sim:
+                        best_raw_sim = sim
+                        best_raw_name = name
+                
+                # print(f"best match by face_net: {best_raw_name} with score {best_raw_sim}")
+                if best_raw_sim < raw_threshold:
+                    print(f"ditching this face, due to low score by facenet: {best_raw_sim}")
+                    continue #skipping as facenet is better trained to detect unkowns
+                
+                #!!! NOW, passthrough head
+                
                 new_emb = get_head_embs(emb, model_state_dict)
                 #now, perform cosine similarity against all other student embeddings
-                scores = {}
-                best_sim, best_name = -1, None
+                scores_head = {}
+                best_head_sim, best_head_name = -1, None
+                # best_sim2 = -1
                 for e,name in embeddings:
                     with torch.no_grad():
                         stored_e_head = get_head_embs(e, model_state_dict)
                     sim = F.cosine_similarity(new_emb, stored_e_head, dim=1).item() #both are 64-d projected embs now
-                    scores[name] = sim
-                    if sim > best_sim:
-                        best_sim = sim
-                        best_name = name
-                        
+                    scores_head[name] = sim
+                    if sim > best_head_sim:
+                        # best_sim2 = best_sim
+                        best_head_sim = sim
+                        best_head_name = name
                 
-                print(scores)
-                if best_sim > 0.7:
-                    print(f"Detected {best_name} with similarity {best_sim:.2f}")
+                print(scores_head)
+                if best_head_sim > head_threshold:
+                    detected_people.append(best_head_name) 
+                    print(f"Detected {best_head_name} with similarity {best_head_sim:.2f}")
                     #add to future frame the current detected bounding box
                     x1, y1, x2, y2 = map(int, boxes[idx])
                     cv2.rectangle(img_np, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    cv2.putText(img_np, f"{best_name} ({best_sim:.2f})", (x1, y1 - 10),
+                    cv2.putText(img_np, f"{best_head_name} ({best_head_sim:.2f})", (x1, y1 - 10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                    
+                    
+                # -----------------
+                       
+                # neg_sims = F.cosine_similarity(new_emb, world_neg_proj)
+                # avg_world_sim = torch.mean(neg_sims).item()#as world has 1000 embeddings frmo lfw wild
+                # best_world_sim = torch.max(neg_sims).item()
+                # print(f"best student sim: {best_sim:.2f}, avg world sim: {avg_world_sim:.2f}, highest neg_sim: {best_world_sim:.2f}")
+
+                # print(scores)
+                # # diff = best_sim - best_sim2
+                # if best_sim > 0.6  and best_sim > best_world_sim and best_sim > avg_world_sim + 0.2: #we want to maximize distance between actual sim and similarity to the 'world'
+                #     detected_people.append(best_name)
+                #     print(f"Detected {best_name} with similarity {best_sim:.2f}")
+                #     #add to future frame the current detected bounding box
+                #     x1, y1, x2, y2 = map(int, boxes[idx])
+                #     cv2.rectangle(img_np, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                #     cv2.putText(img_np, f"{best_name} ({best_sim:.2f})", (x1, y1 - 10),
+                #                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
                     
                     #create excel sheet with attendance and return (WIP)
                         
                         
         # img_np = cv2.cvtColor(img_np, cv2.COLOR_BGR2RGB)
         _, img_encoded = cv2.imencode(".jpg", img_np)
-        return StreamingResponse(io.BytesIO(img_encoded.tobytes()), media_type="image/jpeg")
+        img_bytes = img_encoded.tobytes()
+        img_base64 = base64.b64encode(img_bytes).decode("utf-8")
+
+        return {"names": detected_people, "image": img_base64}
 
     except Exception as e:
         print("Error during image processing:")

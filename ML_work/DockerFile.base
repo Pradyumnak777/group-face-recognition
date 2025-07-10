@@ -12,13 +12,14 @@ RUN apt-get update && \
 WORKDIR /app
 COPY req.txt .
 RUN pip install --no-cache-dir -r req.txt
+# copy the pre-trained on vggface into the container
+COPY 20180402-114759-vggface2.pt /root/.cache/torch/checkpoints/
 
 COPY api_calls_and_functions/shared_material ./api_calls_and_functions/shared_material
+
 COPY api_calls_and_functions/register_face_api/register.py ./api_calls_and_functions/register_face_api/register.py
 COPY api_calls_and_functions/mark_person_api/test.py ./api_calls_and_functions/mark_person_api/test.py
 COPY unified_app.py .
 
-# copy the pre-trained on vggface into the container
-COPY 20180402-114759-vggface2.pt /root/.cache/torch/checkpoints/
 CMD ["uvicorn", "unified_app:app", "--host", "0.0.0.0", "--port", "8000"]
 

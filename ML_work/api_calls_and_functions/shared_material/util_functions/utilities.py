@@ -15,7 +15,7 @@ from pathlib import Path
 import time
 #global loads-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+print(device)
 model = YOLO("api_calls_and_functions/shared_material/packages/best.pt")
 model.to(device)
 model.fuse()   # tiny speed boost
