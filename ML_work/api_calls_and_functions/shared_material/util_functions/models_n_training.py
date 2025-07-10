@@ -133,44 +133,31 @@ class custom_head(nn.Module):
 
 class TripletDataset(Dataset):
     def __init__(self, student_dict):
-        self.data = [] #embed data
-        self.labels = [] # name data
-        for stud,embeds in student_dict.items(): #{student: [emb1 (512d), emb2 (512d), ...]}
-            for emb in embeds:
-                self.data.append(emb) 
-                self.labels.append(stud)
-
-        self.data = np.array(self.data)
-        self.labels = np.array(self.labels)
         self.student_dict = student_dict
+        self.labels = list(student_dict.keys())
+        
+        self.label_embeds_dict = {    # {label:embeds1, label2:e2, ...}
+            label: list(range(len(embeds)))
+            for label, embeds in student_dict.items()
+        }
     
     def __len__(self):
-        return len(self.data) * 5
+        return len(self.labels) * 20
     
     def __getitem__(self, index):
         #select an anchor at random
-        anchor_idx = random.randint(0, len(self.data) - 1)
-        anchor_label = self.labels[anchor_idx]
-        anchor = self.data[anchor_idx]
+        anchor_label = random.choice(self.labels)
+        pos_embeds = self.student_dict[anchor_label]
+        # print(f"pos_embeds length from dict: {len(pos_embeds)}")
+        anchor, positive = random.sample(list(pos_embeds), 2)
         
-        #chose another random one frmo the same student
-        pos_embed_list = self.student_dict[anchor_label] 
-        while True:
-            pos_idx = random.randint(0, len(pos_embed_list) - 1)
-            positive = pos_embed_list[pos_idx]
-            if not np.array_equal(anchor, positive):
-                break
-        
-        #now chose negative
-        
-        neg_label_options = [i for i in self.student_dict if i != anchor_label]
-        neg_label = random.choice(neg_label_options)
-        neg = random.choice(self.student_dict[neg_label])
+        neg_label = random.choice([l for l in self.labels if l != anchor_label])
+        negative = random.choice(self.student_dict[neg_label])
 
         return (
             torch.tensor(anchor, dtype=torch.float32),
             torch.tensor(positive, dtype=torch.float32),
-            torch.tensor(neg, dtype=torch.float32)
+            torch.tensor(negative, dtype=torch.float32)
         )
         
 
@@ -178,7 +165,7 @@ def train_head(student_embeddings_dict, model2, optimizer):
     device = next(model2.parameters()).device
     triplet_dataset = TripletDataset(student_embeddings_dict)     
     triplet_loader = DataLoader(triplet_dataset, batch_size=32, shuffle=True)
-    num_epochs = 20
+    num_epochs = 15
     model2.train()
     for epoch in range(num_epochs):
         total_loss = 0.0

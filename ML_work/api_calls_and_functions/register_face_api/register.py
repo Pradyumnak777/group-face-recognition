@@ -72,6 +72,7 @@ async def upload_imgs(files: List[UploadFile] = File(...),
             buffer = io.BytesIO()
             np.savez(buffer, **student_embeddings_dict)
             buffer.seek(0)
+            print(f"for {student_name} pos embeds length: {len(pos_embeddings)}")
             s3_client.upload_fileobj(buffer, s3_bucket, f'embedding_dictionary/student_embeddings_dict.npz') #this is a dictionary of pos student embeddings.
 
             
@@ -133,8 +134,11 @@ async def upload_imgs(files: List[UploadFile] = File(...),
                 state_dict = torch.load(model_buffer, map_location=device)
                 model2.load_state_dict(state_dict)
                 print("Loaded existing model state from S3.")
-                        
-            optimizer = torch.optim.Adam(model2.parameters(), lr=0.001)
+                optimizer = torch.optim.Adam(model2.parameters(), lr=0.0001)
+            else:
+                optimizer = torch.optim.Adam(model2.parameters(), lr=0.001) #when training from scratch
+
+            print(f"for {student_name} pos embeds length: {len(pos_embeddings)}")
             model2 = train_head(student_embeddings_dict,model2,optimizer)
             
             #this model will now be used(and updated, upon new registrations) globally
