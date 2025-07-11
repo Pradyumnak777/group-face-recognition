@@ -80,7 +80,7 @@ class _RegisterPageState extends State<RegisterPage> {
       _isLoading = true;
     });
 
-    final uri = Uri.parse('http://192.168.1.4:8000/register/register-student');
+    final uri = Uri.parse('<put your IP here>:8000/register/register-student');
     final request = http.MultipartRequest('POST', uri);
 
     request.files.add(

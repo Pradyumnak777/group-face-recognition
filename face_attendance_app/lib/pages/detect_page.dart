@@ -31,7 +31,7 @@ class _DetectPageState extends State<DetectPage> {
       _image = pickedImage;
     });
 
-    final url = Uri.parse('http://192.168.1.4:8000/mark/detect');
+    final url = Uri.parse('<put your IP here>:8000/mark/detect');
     final request = http.MultipartRequest('POST', url);
 
     _compressedBytes = await FlutterImageCompress.compressWithFile(
