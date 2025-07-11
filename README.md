@@ -28,6 +28,7 @@ This system is intended to be an on the fly attendance system via a mobile appli
 ### How to run
 
 - Clone this repo and install the required libraries through the .yaml file.
+- go to [this drive link](https://drive.google.com/drive/folders/1IhGQD2WDNha04nj15gO_rgo_WKZPP8sC?usp=sharing) and install this folder, containing the pretrained YOLO model, head_segmentation model and facenet. Place this folder under `ML_work\api_calls_and_functions\shared_material`
 - **!!IMPORTANT**- This application primarily uses Amazon S3 for storage and retrieval. It will NOT work unless you make a `.env` file specifying: `AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET_NAME` under the `ML_work` directory.
 - Navigate to `unified_app.py` and run it. Then via the terminal, run the following command: `uvicorn unified_app:app --host 0.0.0.0 --port 8000` (to run on the local host)
 - From the client machine, make a POST request to `/register/register-student` to register a student and `/mark/detect` for the inference API. A simple flutter frontend is provided in this repo. You can create an apk, enable a firewall rule to allow private network traffic through port 8000, and test it wirelessly from your android mobile phone. Please note that you would have to change the API's IP in `face_attendance_app\lib\pages\detect_page.dart` and `face_attendance_app\lib\pages\register_page.dart`
