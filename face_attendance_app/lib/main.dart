@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart'; //contains runApp function
 import 'package:face_attendance_app/pages/register_page.dart'; //importing the register page
+import 'package:face_attendance_app/pages/detect_page.dart'; //importing the detection page
 
 void main() {
   runApp(
@@ -41,13 +42,12 @@ class HomeScreen extends StatelessWidget {
             child: const Text('Register Person'),
           ),
           ElevatedButton(
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (context) => const DetectPage()));
+            },
             child: const Text('Record Attendance'),
           ),
-          ElevatedButton(
-            onPressed: () {},
-            child: const Text('Registered Persons'),
-          )
         ],
       ),
     ));

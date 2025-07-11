@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'dart:typed_data';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-
-//camera access must be provided, after clicking, a preview for confirmation, and then an add button.
-//api should be contacted via a buttono click, and the image should be sent to the api for processing.
-//finally a message saying - 'added' should be displayed
+import 'package:http_parser/http_parser.dart';
 
 class DialogBox extends StatelessWidget {
   final TextEditingController nameController = TextEditingController();
-  final TextEditingController groupController = TextEditingController();
 
   DialogBox({super.key});
 
@@ -21,24 +19,16 @@ class DialogBox extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
-            controller: nameController, // Store Name input
+            controller: nameController,
             decoration: const InputDecoration(hintText: 'Name'),
-          ),
-          TextField(
-            controller: groupController, // Store Group Name input
-            decoration: const InputDecoration(hintText: 'Group Name'),
           ),
         ],
       ),
       actions: [
         TextButton(
           onPressed: () {
-            // Access the values using nameController.text and groupController.text
             final name = nameController.text;
-            final group = groupController.text;
-
-            // Pass the values back or use them as needed
-            Navigator.of(context).pop({'name': name, 'group': group});
+            Navigator.of(context).pop({'name': name});
           },
           child: const Text('OK'),
         ),
@@ -55,61 +45,78 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  XFile?
-      _image; // holds the picked image, this can be used in the functions below (as a global variable)
-  final ImagePicker _picker = ImagePicker(); // camera/gallery access
+  bool _isLoading = false;
+  XFile? _image;
+  Uint8List? _compressedBytes;
+  final ImagePicker _picker = ImagePicker();
 
-  // Step 1: Pick image from camera or gallery
   Future<void> _pickImage(ImageSource source) async {
-    //ImageSource can be camera or gallery, its the arg here
-    //this is a function, that will be called in the static part
-    final pickedImage = await _picker.pickImage(
-        source:
-            source); //_picker.pickImage is a method that will open the camera or gallery
+    final pickedImage = await _picker.pickImage(source: source);
     if (pickedImage != null) {
-      // if an image is picked
-      setState(() {
-        _image = pickedImage; // now '_image' holds a jpg/png file
-      });
+      final compressed = await FlutterImageCompress.compressWithFile(
+        pickedImage.path,
+        quality: 95,
+        rotate: 0, // disable auto-rotation by forcing zero
+        format: CompressFormat.jpeg,
+      );
+
+      if (compressed != null) {
+        setState(() {
+          _image = pickedImage;
+          _compressedBytes = compressed;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image compression failed')),
+        );
+      }
     }
   }
 
-  // Step 2:  API call
-  Future<void> _sendToApi(String name, String group) async {
-    //first, take in name and group name
-    if (_image == null) return;
-    //send the _image to the server
-    final uri = Uri.parse('http://your-api-url:8000/register-student');
+  Future<void> _sendToApi(String name) async {
+    if (_compressedBytes == null) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    final uri = Uri.parse('http://192.168.1.4:8000/register/register-student');
     final request = http.MultipartRequest('POST', uri);
 
     request.files.add(
-      await http.MultipartFile.fromPath(
-        'files', // field name in the API
-        _image!.path, // path to the image file
+      http.MultipartFile.fromBytes(
+        'files',
+        _compressedBytes!,
+        filename: 'captured.jpg',
+        contentType: MediaType('image', 'jpeg'),
       ),
     );
 
     request.fields['student_name'] = name;
-    request.fields['group_name'] = group;
 
-    final response = await request.send();
-    if (response.statusCode == 200) {
-      // Handle success
+    try {
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Face registered successfully!')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to register face. ${response.body}')),
+        );
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Face registered successfully!')),
-      );
-    } else {
-      // Handle error
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to register face.')),
+        SnackBar(content: Text('Error: $e')),
       );
     }
 
-    // Step 3: Show success message
-
-    // Optionally clear image after success
     setState(() {
+      _isLoading = false;
       _image = null;
+      _compressedBytes = null;
     });
   }
 
@@ -124,9 +131,9 @@ class _RegisterPageState extends State<RegisterPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _image == null
+              _compressedBytes == null
                   ? const Text('No image selected.')
-                  : Image.file(File(_image!.path)), // display the image
+                  : Image.memory(_compressedBytes!),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () => _pickImage(ImageSource.camera),
@@ -138,27 +145,23 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: const Text('Pick Image from Gallery'),
               ),
               const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () async {
-                  //here, a popup should be shown, asking for name and group name
-                  //then, the opo up should be closed and the image should be sent to the api
-                  //after the image is sent, a message should be shown saying - 'added'
-                  // DialogBox(); this wont work, so we need to use showDialog
-                  final result = await showDialog(
-                    context: context,
-                    builder: (BuildContext context) {
-                      return DialogBox();
-                    },
-                  );
-                  if (result != null) {
-                    // If the user provided input, send it to the API
-                    final name = result['name'];
-                    final group = result['group'];
-                    await _sendToApi(name, group);
-                  }
-                },
-                child: const Text('Register Person'),
-              ),
+              _isLoading
+                  ? const CircularProgressIndicator()
+                  : ElevatedButton(
+                      onPressed: () async {
+                        final result = await showDialog(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return DialogBox();
+                          },
+                        );
+                        if (result != null) {
+                          final name = result['name'];
+                          await _sendToApi(name);
+                        }
+                      },
+                      child: const Text('Register Person'),
+                    ),
             ],
           ),
         ));

@@ -12,6 +12,7 @@ dependencies:
   flutter:
     sdk: flutter
   image_picker: ^1.0.4
+  flutter_image_compress: ^2.4.0
   http: ^0.13.6
 
   english_words: ^4.0.0
