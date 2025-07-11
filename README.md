@@ -51,7 +51,7 @@ pradyumnak/face-recog-api:latest
 ### Notes and Highlights
 
 - YOLO has been used face face detection
-- [head-segmentation by Wiktor Łazarski](https://github.com/wiktorlazarski/head-segmentation) has been used for to segment heads.
+- [head-segmentation by Wiktor Łazarski](https://github.com/wiktorlazarski/head-segmentation) has been used or to segment heads.
 - InceptionResnetV1 has been used to generate the 512d embeddings (facenet).
 - Custom trained triplet loss based model has been used to generate 64d embeddings (from 512d).
 
