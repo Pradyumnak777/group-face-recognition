@@ -7,7 +7,7 @@ This system is intended to be an on the fly attendance system via a mobile appli
 - **One-shot Registration** – A single image is captured during registration. This is augmented to create the positive set.
 - **Face Embedding + Custom Model** – Embeddings are extracted using a pre-trained FaceNet model(on vggface) and are then refined using a custom neural head trained with triplet loss, during the registration process.
 - **Incremental Learning** – The head is retrained with every new registration to adapt to the expanding pool of users.
-- **Two-stage Inference** – As the custom model is naturally poor at eliminating _unregistered faces_(as it is only trained with registered people), the embedddings from facenet are first used to filter out potential unregistered candidates(via threshlding). Thehn, the face is passed to the custom model- which is better at discriminating between known faces.
+- **Two-stage Inference** – As the custom model is naturally poor at eliminating **_unregistered faces_** (as it is only trained with registered people), the embedddings from facenet are first used to filter out potential unregistered candidates(via threshlding). Thehn, the face is passed to the custom model- which is better at discriminating between known faces.
 
 ### Brief Workflow
 
