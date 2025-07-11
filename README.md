@@ -32,16 +32,21 @@ This system is intended to be an on the fly attendance system via a mobile appli
 - **!!IMPORTANT**- This application primarily uses Amazon S3 for storage and retrieval. It will NOT work unless you make a `.env` file specifying: `AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET_NAME` under the `ML_work` directory.
 - Navigate to `unified_app.py` and run it. Then via the terminal, run the following command: `uvicorn unified_app:app --host 0.0.0.0 --port 8000` (to run on the local host)
 - From the client machine, make a POST request to `/register/register-student` to register a student and `/mark/detect` for the inference API. A simple flutter frontend is provided in this repo. You can create an apk, enable a firewall rule to allow private network traffic through port 8000, and test it wirelessly from your android mobile phone. Please note that you would have to change the API's IP in `face_attendance_app\lib\pages\detect_page.dart` and `face_attendance_app\lib\pages\register_page.dart`
-- If you would like a more hasslefree imlpementation and do not want to inspect/customize the code currently, you can clone the docker image from dockerhub to use the APIs: `docker pull pradyumnak/face-recog-api:latest`. Please note that you have to specify the environment variables again.
-  - Create a `.env` file in the same directory where `docker run` would be executed. Then run `docker run --env-file .env pradyumnak/face-recog-api:latest`
-  - Alternatively, pass the environment variables directly.
-  ```
-  docker run \
-  -e AWS_ACCESS_KEY_ID=your-access-key \
-  -e AWS_SECRET_ACCESS_KEY=your-secret-key \
-  -e S3_BUCKET_NAME=you-bucket-name \
-  pradyumnak/face-recog-api:latest
-  ```
+
+#### Running via docker
+
+If you would like a more hasslefree imlpementation and do not want to inspect/customize the code currently, you can clone the docker image from dockerhub to use the APIs: `docker pull pradyumnak/face-recog-api:latest`. Please note that you have to specify the environment variables again.
+
+- Create a `.env` file in the same directory where `docker run` would be executed. Then run `docker run --env-file .env pradyumnak/face-recog-api:latest`
+- Alternatively, pass the environment variables directly.
+
+```
+docker run \
+-e AWS_ACCESS_KEY_ID=your-access-key \
+-e AWS_SECRET_ACCESS_KEY=your-secret-key \
+-e S3_BUCKET_NAME=you-bucket-name \
+pradyumnak/face-recog-api:latest
+```
 
 ### Notes and Highlights
 
